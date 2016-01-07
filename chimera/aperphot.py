@@ -58,15 +58,15 @@ class Aperphot:
         self.fwhmpsf = 6.0
         self.sigma = 10.0
         self.readnoise = 10
-        self.epadu = 4.2
+        self.epadu = 1.89
         self.exposure = 'EXPTIME'
 
         self.calgorithm = 'centroid'
-        self.cbox = 8 
+        self.cbox = 8
         self.maxshift = 5
 
         self.salgorithm = 'median' 
-        self.annulus = 16 
+        self.annulus = 14 
         self.dannulus = 16
 
         self.apertures = 12.0
@@ -207,3 +207,11 @@ class Aperphot:
         iraf.phot(image = self.sci_file + "[,," + str(framenum) + "]", coords = coords, output = outfile, fwhmpsf = self.fwhmpsf, sigma = self.sigma, readnoise = self.readnoise, epadu = self.epadu, exposure = self.exposure, calgorithm = self.calgorithm, cbox = self.cbox, maxshift = self.maxshift, salgorithm = self.salgorithm, annulus = self.annulus, dannulus = self.dannulus, apertures = apertures, zmag = self.zmag, interactive = "no", verify = "no", verbose = verbose)        
         
         return
+        
+        
+    def phot2(self):
+        """
+        
+        
+        """
+        pass

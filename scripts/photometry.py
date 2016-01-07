@@ -102,7 +102,7 @@ def plotter(phot_data, nframes, exptime, outfile):
     plt.ylabel("Normalized Flux")
     #dt = [item.split('T')[1] for item in phot_data['DATETIME']]
     #plt.xticks(np.arange(min(ts), max(ts)+10, 60), dt, rotation = 45)
-    plt.plot(ts, phot_data['FLUX']/np.mean(phot_data['FLUX']), "r-")    
+    plt.plot(ts, phot_data['FLUX_ADU']/np.mean(phot_data['FLUX_ADU']), "r-")    
     plt.savefig(outfile, dpi = 300, bbox_inches = "tight")
     
     return
@@ -184,7 +184,7 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus):
         print "  Nominal aperture radius : %4.1f pixels" %nom_aper
            
         # Perform aperture photometry on all the frames
-        dtype = [("DATETIME", "S25"),("XCEN", "f4"),("YCEN", "f4"),("CIER", "i4"),("MSKY", "f4"),("STDEV", "f4"),("NSKY", "i4"),("SIER", "i4"),("SUM", "f4"),("AREA", "f4"),("FLUX", "f4"),("MAG", "f4"),("MERR", "f4"),("PIER", "i4"),]
+        dtype = [("DATETIME", "S25"),("XCEN", "f4"),("YCEN", "f4"),("CIER", "i4"),("MSKY", "f4"),("STDEV", "f4"),("NSKY", "i4"),("SIER", "i4"),("SUM", "f4"),("AREA", "f4"),("FLUX_ADU", "f4"),("FLUX_ELEC", "f4"),("FERR", "f4"),("MAG", "f4"),("MERR", "f4"),("PIER", "i4"),]
         phot_data = np.zeros([ap.nframes], dtype = dtype)
         for j in range(ap.nframes):
             print "    Processing frame number : %d" %(j+1)
@@ -207,11 +207,16 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus):
             phot_data[j]['SIER'] = int(aperphot_data[6])
             phot_data[j]['SUM'] = float(aperphot_data[7])
             phot_data[j]['AREA'] = float(aperphot_data[8])
-            phot_data[j]['FLUX'] = float(aperphot_data[9])
-            phot_data[j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[j]['FLUX'])
+            phot_data[j]['FLUX_ADU'] = float(aperphot_data[9])
+            phot_data[j]['FLUX_ELEC'] = float(aperphot_data[9]) * ap.epadu
+            phot_data[j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[j]['FLUX_ELEC'])
             phot_data[j]['MERR'] = float(aperphot_data[10])
             phot_data[j]['PIER'] = int(aperphot_data[11])
             
+            # Calculate error in flux - using the formula
+            # err = sqrt(flux * gain + npix * (1 + (npix/nsky)) * (flux_sky * gain + R**2))
+            phot_data[j]['FERR'] = np.sqrt(phot_data[j]['FLUX_ELEC'] + phot_data[j]['AREA'] * (1 + phot_data[j]['AREA']/phot_data[j]['NSKY']) * (phot_data[j]['MSKY'] * ap.epadu + ap.readnoise**2))
+                        
         # Save photometry data in numpy binary format
         print "  Saving photometry data as numpy binary"
         npy_outfile = sci_file.replace(".fits", ".phot.npy")

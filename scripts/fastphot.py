@@ -4,7 +4,7 @@
     --------------------------------------------------------------------------
     Routine to perform aperture photometry on CHIMERA science frames.
     
-    Usage: python photometry.py [options] image coords
+    Usage: python fastphot.py [options] image coords
         
                                 
     Author:
@@ -14,7 +14,7 @@
         Caltech, Pasadena, CA, USA
 
     Version:
-        20 December 2015     0.1dev     Initial implementation 
+        7 January 2015     0.1     Initial implementation 
     --------------------------------------------------------------------------        
 """
 
@@ -106,7 +106,7 @@ def process(infile, coords, method, inner_radius, outer_radius, cen_method, wind
     -------
     None 
     """
-    print "PHOTOMETRY: CHIMERA Aperture Photometry Routine"
+    print "FASTPHOT: CHIMERA Fast Aperture Photometry Routine"
     
     inner_radius = float(inner_radius)
     outer_radius = float(outer_radius)
@@ -226,7 +226,7 @@ if __name__ == "__main__":
                                         
     (options, args) = parser.parse_args()  
     if len(args) != 2:
-        parser.error("PHOTOMETRY: Incorrect number of arguments")
+        parser.error("FASTPHOT: Incorrect number of arguments")
         
     # Check verbosity
     if not options.verbose:

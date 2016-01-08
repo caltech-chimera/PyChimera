@@ -9,7 +9,7 @@ setup(
       packages=find_packages(),
       
       # PROPER uses numpy and scipy
-      install_requires = ['numpy>=1.8', 'scipy>=0.14', 'pyfits>=3.0', 'pyraf>=2.1'],
+      install_requires = ['numpy>=1.8', 'scipy>=0.14', 'pyfits>=3.0', 'pyraf>=2.1', 'photutils>=0.2'],
       
       package_data = {
         # If any package contains *.txt, *.rst or *.fits files, include them:

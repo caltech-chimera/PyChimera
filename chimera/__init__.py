@@ -8,4 +8,5 @@ from .imutil import imfill, imshow, imhist, imcombine
 from .fitsutil import fitsread, fitswrite, fitshead, fitscombine
 from .calibrate import masterbias, masterflat, imreduce
 from .aperphot import Aperphot
+from .search import recenter
 

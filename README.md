@@ -13,6 +13,7 @@ Python package to reduce, process and analyze science images from the CHIMERA in
   + Numpy >= 1.8
   + pyfits >= 0.14
   + pyraf >= 2.1
+  + photutils >= 0.2
 
 * To install pychimera -
   + Clone the pychimera repository to local machine

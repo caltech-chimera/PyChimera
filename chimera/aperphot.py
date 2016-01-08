@@ -97,6 +97,7 @@ class Aperphot:
         self.nx = header["NAXIS1"]
         self.ny = header["NAXIS2"]
         self.nframes = header["NAXIS3"]
+        self.exptime = header["EXPTIME"]
         self.kintime = header["KINCYCTI"]
         utcstart = header["UTCSTART"]
         self.utcstart = self.parser(utcstart)

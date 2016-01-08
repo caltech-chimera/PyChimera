@@ -209,7 +209,7 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus):
             phot_data[j]['AREA'] = float(aperphot_data[8])
             phot_data[j]['FLUX_ADU'] = float(aperphot_data[9])
             phot_data[j]['FLUX_ELEC'] = float(aperphot_data[9]) * ap.epadu
-            phot_data[j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[j]['FLUX_ELEC'])
+            phot_data[j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[j]['FLUX_ELEC']/ap.exptime)
             phot_data[j]['MERR'] = float(aperphot_data[10])
             phot_data[j]['PIER'] = int(aperphot_data[11])
             

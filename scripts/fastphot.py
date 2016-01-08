@@ -169,7 +169,7 @@ def process(infile, coords, method, inner_radius, outer_radius, cen_method, wind
             phot_data[j]['AREA'] = aperphot_data["area"]
             phot_data[j]['FLUX_ADU'] = aperphot_data["flux"]
             phot_data[j]['FLUX_ELEC'] = phot_data[j]['FLUX_ADU'] * ap.epadu
-            phot_data[j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[j]['FLUX_ELEC'])
+            phot_data[j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[j]['FLUX_ELEC']/ap.exptime)
             
             # Calculate error in flux - using the formula
             # err = sqrt(flux * gain + npix * (1 + (npix/nsky)) * (flux_sky * gain + R**2))

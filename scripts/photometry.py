@@ -108,7 +108,7 @@ def plotter(phot_data, nframes, exptime, outfile):
     return
                 
                                 
-def process(infile, coords, fwhmpsf, sigma, annulus, dannulus):
+def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output):
     """
     Entry point function to process science image.
     
@@ -131,6 +131,9 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus):
         
     dannulus : int
         Radius of sky annulus in pixels 
+        
+    output : string
+        Output file name
                 
     Returns
     -------
@@ -219,7 +222,10 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus):
                         
         # Save photometry data in numpy binary format
         print "  Saving photometry data as numpy binary"
-        npy_outfile = sci_file.replace(".fits", ".phot.npy")
+        if output != "":
+            npy_outfile = output + ".npy"
+        else:
+            npy_outfile = sci_file.replace(".fits", ".phot.npy")
         if os.path.exists(npy_outfile):
             os.remove(npy_outfile)
             
@@ -228,7 +234,11 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus):
         # Plot first pass light curve
         if plot_flag:
             print "  Plotting normalized light curve"
-            plotter(phot_data, ap.nframes, ap.kintime, sci_file.replace(".fits", ".lc.png"))
+            if output != "":
+                plt_outfile = output + ".png"
+            else:
+                plt_outfile = sci_file.replace(".fits", ".lc.png")
+            plotter(phot_data, ap.nframes, ap.kintime, plt_outfile)
         
     return
 
@@ -246,21 +256,25 @@ if __name__ == "__main__":
                     help = "don't print result messages to stdout"
                     )
     parser.add_option("-f", "--fwhmpsf", dest = "fwhmpsf",
-                    action='store', metavar="FWHMPSF", help = "FWHM of PSF (default is 6 pixels)",
+                    action="store", metavar="FWHMPSF", help = "FWHM of PSF (default is 6 pixels)",
                     default = 6
                     )
     parser.add_option("-s", "--sigma", dest = "sigma",
-                    action='store', metavar="SIGMA", help = "Sky background sigma (default is 10)",
+                    action="store", metavar="SIGMA", help = "Sky background sigma (default is 10)",
                     default = 10
                     )
     parser.add_option("-r", "--annulus", dest = "annulus",
-                    action='store', metavar="ANNULUS", help = "Inner radius of sky annlus in pixels (default is 14)",
+                    action="store", metavar="ANNULUS", help = "Inner radius of sky annlus in pixels (default is 14)",
                     default = 14
                     )
     parser.add_option("-d", "--dannulus", dest = "dannulus",
-                    action='store', metavar="DANNULUS", help = "Radius of sky annulus in piexls (default is 16)",
+                    action="store", metavar="DANNULUS", help = "Radius of sky annulus in piexls (default is 16)",
                     default = 16
                     )
+    parser.add_option("-o", "--output", dest = "output",
+                    action="store", metavar="OUTPUT", help = "Output file name",
+                    default=""
+                    )        
                                                                 
                                         
     (options, args) = parser.parse_args()  
@@ -276,7 +290,7 @@ if __name__ == "__main__":
     # Switch off warnings
     warnings.filterwarnings('ignore')
     
-    process(args[0], args[1], options.fwhmpsf, options.sigma, options.annulus, options.dannulus)    
+    process(args[0], args[1], options.fwhmpsf, options.sigma, options.annulus, options.dannulus, options.output)    
 
     # Reset verbosity
     if not options.verbose:

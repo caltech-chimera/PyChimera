@@ -25,7 +25,7 @@ from optparse import OptionParser
 import chimera
 
 
-def process(sci_files, bias_file, flat_file, nskip, threshold):
+def process(sci_files, bias_file, flat_file, nskip, threshold, output):
     """
     Entry point function to process science images.
     
@@ -95,8 +95,12 @@ def process(sci_files, bias_file, flat_file, nskip, threshold):
         sci_red_image, sci_avg_image = chimera.imreduce(sci_image, master_bias_image, master_flat_image)
 
         # Write the reduced and average FITS image
-        red_file = sci_file.replace('.fits', '_final.fits')
-        avg_file = sci_file.replace('.fits', '_avg.fits')
+        if output != "":
+            red_file = output + "_final.fits"
+            avg_file = output + "_avg.fits"
+        else:
+            red_file = sci_file.replace('.fits', '_final.fits')
+            avg_file = sci_file.replace('.fits', '_avg.fits')
         
         if os.path.exists(red_file):
             os.remove(red_file)
@@ -131,6 +135,10 @@ if __name__ == "__main__":
                     action='store', metavar="THRESHOLD", help = "Threshold for normalized flatfields (default is 0.8)",
                     default = 0.8
                     )
+    parser.add_option("-o", "--output", dest = "output",
+                    action="store", metavar="OUTPUT", help = "Output file name",
+                    default = ""
+                    )                    
                                         
     (options, args) = parser.parse_args()  
     if len(args) != 3:
@@ -142,7 +150,7 @@ if __name__ == "__main__":
         old_stdout = sys.stdout
         sys.stdout = output
  
-    process(args[0], args[1], args[2], options.skip, options.threshold)    
+    process(args[0], args[1], args[2], options.skip, options.threshold, options.output)    
 
     # Reset verbosity
     if not options.verbose:

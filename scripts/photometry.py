@@ -15,6 +15,7 @@
 
     Version:
         20 December 2015     0.1dev     Initial implementation 
+         9 Feb 2016          0.2        User can input photometric zero point
     --------------------------------------------------------------------------        
 """
 
@@ -108,7 +109,7 @@ def plotter(phot_data, nframes, exptime, outfile):
     return
                 
                                 
-def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output):
+def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output, zmag):
     """
     Entry point function to process science image.
     
@@ -134,6 +135,9 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output):
         
     output : string
         Output file name
+        
+    zmag : string
+        Photometric zero point
                 
     Returns
     -------
@@ -174,11 +178,14 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output):
         # Instantiate an Aperphot object
         ap = chimera.Aperphot(sci_file, coords)
         
-        # Set fwhmpsf, sigma, annulus and dannulus
+        # Set fwhmpsf, sigma, annulus. dannulus and zero point
         ap.fwhmpsf = fwhmpsf
         ap.sigma = sigma
         ap.annulus = annulus
         ap.dannulus = dannulus
+        
+        if zmag != "":
+            ap.zmag = float(zmag)
         
         # Determine nominal aperture radius for photometry
         if i == 0:
@@ -246,7 +253,7 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output):
 if __name__ == "__main__":
     usage = "Usage: python %prog [options] sci_image coords"
     description = "Description. Utility to perform aperture photometry in CHIMERA science images."
-    parser = OptionParser(usage = usage, version = "%prog 0.1dev", description = description)
+    parser = OptionParser(usage = usage, version = "%prog 0.2", description = description)
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose", default = False,
                       help = "print result messages to stdout"
@@ -274,7 +281,11 @@ if __name__ == "__main__":
     parser.add_option("-o", "--output", dest = "output",
                     action="store", metavar="OUTPUT", help = "Output file name",
                     default=""
-                    )        
+                    ) 
+    parser.add_option("-z", "--zmag", dest = "zmag",
+                    action="store", metavar="ZMAG", help = "Photometric zeroo point",
+                    default = ""
+                    )       
                                                                 
                                         
     (options, args) = parser.parse_args()  
@@ -290,7 +301,7 @@ if __name__ == "__main__":
     # Switch off warnings
     warnings.filterwarnings('ignore')
     
-    process(args[0], args[1], options.fwhmpsf, options.sigma, options.annulus, options.dannulus, options.output)    
+    process(args[0], args[1], options.fwhmpsf, options.sigma, options.annulus, options.dannulus, options.output, options.zmag)    
 
     # Reset verbosity
     if not options.verbose:

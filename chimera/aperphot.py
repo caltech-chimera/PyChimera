@@ -1,6 +1,7 @@
 
 import pyfits
 import chimera
+from chimera import config
 import numpy as np
 from pyraf import iraf
 from datetime import datetime, timedelta
@@ -14,14 +15,87 @@ class Aperphot:
         self.sci_file = sci_file
         self.coords = coords
         
+        # load configuration file
+        cfg = config.Config()
+        self.cfg_data = cfg.load()
+        
         # Set header keyword parameters
         self.setkeywords()
         
-        # Set IRAF parameters and load packages
-        self.setiraf()
+        # Set parameters
         self.setparams()
 
 
+    def setkeywords(self):
+        """
+        Set FITS image header keyword parameters.
+        
+        Parameters
+        ----------
+        
+        Returns
+        -------
+        None
+        """
+        header = pyfits.getheader(self.sci_file, ignore_missing_end = True)
+        self.nx = header["NAXIS1"]
+        self.ny = header["NAXIS2"]
+        self.nframes = header["NAXIS3"]
+        self.exptime = header["EXPTIME"]
+        self.kintime = header["KINCYCTI"]
+        self.sn = header["SERIALN"].split("=")[1].strip()
+        self.amptype = header["AMPTYPE"].split()[0]
+        self.emgain = header["EMGAIN"]
+        self.hreadout = header["HREADOUT"].strip()
+        self.preampg = header["PREAMPG"].strip()
+        utcstart = header["UTCSTART"]
+        self.utcstart = self.parser(utcstart)
+        
+        return
+        
+        
+    def setparams(self):
+        """
+        Set datapars, centerpars, fitskypars and photpars.
+        
+        Parameteres
+        -----------
+        
+        Returns
+        -------
+        None
+        """  
+        # Set parameters for daophot 
+        self.fwhmpsf = self.cfg_data["Phot"]["fwhmpsf"]
+        self.sigma = self.cfg_data["Phot"]["sigma"]
+        self.exposure = self.cfg_data["Phot"]["exposure"]
+
+        self.calgorithm = self.cfg_data["Phot"]["calgorithm"]
+        self.cbox = self.cfg_data["Phot"]["cbox"]
+        self.maxshift = self.cfg_data["Phot"]["maxshift"]
+
+        self.salgorithm = self.cfg_data["Phot"]["salgorithm"] 
+        self.annulus = self.cfg_data["Phot"]["annulus"] 
+        self.dannulus = self.cfg_data["Phot"]["dannulus"]
+
+        self.apertures = self.cfg_data["Phot"]["apertures"]
+        self.zmag = self.cfg_data["Phot"]["zmag"]
+
+        self.readnoise = float(self.cfg_data["Detector"][self.sn][self.amptype][self.hreadout][self.preampg][1])
+        self.epadu = float(self.cfg_data["Detector"][self.sn][self.amptype][self.hreadout][self.preampg][0])
+
+        if self.amptype == "EMGAIN":
+            self.readnoise /= self.emgain
+            self.epadu /= self.emgain
+                                
+        # Set parameters for phot
+        self.method = "exact"
+        self.inner_radius = 14
+        self.outer_radius = 30
+
+        return
+        
+        
     def setiraf(self):
         """
         Set IRAF global parameters and load DAOPHOT package for aperture
@@ -43,64 +117,6 @@ class Aperphot:
         iraf.noao.digiphot.daophot(_doprint = 0)
     
         return
-        
-                        
-    def setparams(self):
-        """
-        Set datapars, centerpars, fitskypars and photpars.
-        
-        Parameteres
-        -----------
-        
-        Returns
-        -------
-        None
-        """  
-        # Set parameters for daophot 
-        self.fwhmpsf = 6.0
-        self.sigma = 10.0
-        self.readnoise = 10
-        self.epadu = 1.89
-        self.exposure = 'EXPTIME'
-
-        self.calgorithm = 'centroid'
-        self.cbox = 8
-        self.maxshift = 5
-
-        self.salgorithm = 'median' 
-        self.annulus = 14 
-        self.dannulus = 16
-
-        self.apertures = 12.0
-        self.zmag = 27.11
-        
-        # Set parameters for phot
-        self.method = "exact"
-        self.inner_radius = 14
-        self.outer_radius = 30
-
-        return
-        
-
-    def setkeywords(self):
-        """
-        Set FITS image header keyword parameters.
-        
-        Parameters
-        ----------
-        
-        Returns
-        -------
-        None
-        """
-        header = pyfits.getheader(self.sci_file, ignore_missing_end = True)
-        self.nx = header["NAXIS1"]
-        self.ny = header["NAXIS2"]
-        self.nframes = header["NAXIS3"]
-        self.exptime = header["EXPTIME"]
-        self.kintime = header["KINCYCTI"]
-        utcstart = header["UTCSTART"]
-        self.utcstart = self.parser(utcstart)
         
                         
     def parser(self, utcstart):
@@ -166,6 +182,9 @@ class Aperphot:
         aperture : float
             Nominal aperture radius for photmetry
         """
+        # load iraf packages
+        self.setiraf()
+        
         # Randomly peform curve of growth on 5 frames
         framenum = np.random.randint(1, self.nframes, 5)
         
@@ -259,6 +278,9 @@ class Aperphot:
         -------
         None
         """
+        # load iraf packages
+        self.setiraf()
+        
         iraf.delete(outfile)
         iraf.phot(image = self.sci_file + "[,," + str(framenum) + "]", coords = coords, output = outfile, fwhmpsf = self.fwhmpsf, sigma = self.sigma, readnoise = self.readnoise, epadu = self.epadu, exposure = self.exposure, calgorithm = self.calgorithm, cbox = self.cbox, maxshift = self.maxshift, salgorithm = self.salgorithm, annulus = self.annulus, dannulus = self.dannulus, apertures = apertures, zmag = self.zmag, interactive = "no", verify = "no", verbose = verbose)        
         

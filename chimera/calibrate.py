@@ -139,6 +139,3 @@ def imreduce(sci_image, bias_image, flat_image):
         return sci_red_image, avg_sci_image
     else:
         return sci_red_image
-    
-    
-

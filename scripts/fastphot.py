@@ -14,7 +14,8 @@
         Caltech, Pasadena, CA, USA
 
     Version:
-        7 January 2015     0.1     Initial implementation 
+        7 January 2016     0.1     Initial implementation 
+        9 February 2016    0.2     User input for photometric zero point
     --------------------------------------------------------------------------        
 """
 
@@ -80,7 +81,7 @@ def plotter(phot_data, nframes, exptime, outfile):
     return
                 
                                 
-def process(infile, coords, method, inner_radius, outer_radius, cen_method, window_size, output):
+def process(infile, coords, method, inner_radius, outer_radius, cen_method, window_size, output, zmag):
     """
     Entry point function to process science image.
     
@@ -101,7 +102,19 @@ def process(infile, coords, method, inner_radius, outer_radius, cen_method, wind
     outer_radius : int
         Inner sky annulus radius in pixels
         
+    cen_method : string
+        Centroid method
+        
+    window_size : int
+        Centroid finding window size in pixels
                 
+    output : string
+        Output file name
+        
+    zmag : float
+        Photometric zero point
+                     
+                                                           
     Returns
     -------
     None 
@@ -140,10 +153,13 @@ def process(infile, coords, method, inner_radius, outer_radius, cen_method, wind
         # Instantiate an Aperphot object
         ap = chimera.Aperphot(sci_file, coords)
         
-        # Set fwhmpsf, sigma, annulus and dannulus
+        # Set fwhmpsf, sigma, annulus, dannulus and zmag
         ap.method = method
         ap.inner_radius = inner_radius
         ap.outer_radius = outer_radius
+        
+        if zmag != "":
+            ap.zmag = float(zmag)
         
         # Determine nominal aperture radius for photometry
         if i == 0:
@@ -201,7 +217,7 @@ def process(infile, coords, method, inner_radius, outer_radius, cen_method, wind
 if __name__ == "__main__":
     usage = "Usage: python %prog [options] sci_image coords"
     description = "Description. Utility to perform fast aperture photometry in CHIMERA science images."
-    parser = OptionParser(usage = usage, version = "%prog 0.1", description = description)
+    parser = OptionParser(usage = usage, version = "%prog 0.2", description = description)
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose", default = False,
                       help = "print result messages to stdout"
@@ -234,7 +250,12 @@ if __name__ == "__main__":
                     action="store", metavar="OUTPUT", help = "Output file name",
                     default = ""
                     )                                                                                                       
-                                        
+    parser.add_option("-z", "--zmag", dest = "zmag",
+                    action="store", metavar="ZMAG", help = "Photometric zeroo point",
+                    default = ""
+                    )
+                    
+                                                                                
     (options, args) = parser.parse_args()  
     if len(args) != 2:
         parser.error("FASTPHOT: Incorrect number of arguments")
@@ -248,7 +269,7 @@ if __name__ == "__main__":
     # Switch off warnings
     warnings.filterwarnings('ignore')
     
-    process(args[0], args[1], options.method, options.inner_radius, options.outer_radius, options.cen_method, options.window_size, options.output)    
+    process(args[0], args[1], options.method, options.inner_radius, options.outer_radius, options.cen_method, options.window_size, options.output, options.zmag)    
 
     # Reset verbosity
     if not options.verbose:

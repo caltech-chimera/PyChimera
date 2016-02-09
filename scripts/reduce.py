@@ -14,7 +14,9 @@
         Caltech, Pasadena, CA, USA
 
     Version:
-        20 December 2015     0.1dev     Initial implementation 
+        20 December 2015     0.1dev     Initial implementation
+        05 February 2016     0.2        Added code to read in separate flat field
+                                        bias image. 
     --------------------------------------------------------------------------        
 """
 
@@ -25,7 +27,7 @@ from optparse import OptionParser
 import chimera
 
 
-def process(sci_files, bias_file, flat_file, nskip, threshold, output):
+def process(sci_files, sci_bias_file, flat_file, nskip, threshold, flat_bias_file, output):
     """
     Entry point function to process science images.
     
@@ -34,8 +36,8 @@ def process(sci_files, bias_file, flat_file, nskip, threshold, output):
     sci_files : string
         Science image file names
         
-    bias_file : string
-        Bias image file name
+    sci_bias_file : string
+        Bias image file name for science images
         
     flat_file : string
         Flat field file name
@@ -46,7 +48,10 @@ def process(sci_files, bias_file, flat_file, nskip, threshold, output):
     threshold : float
         Threshold for normalized fat field (value between 0 and 1.0). 
         Default is 0.8.
-        
+
+    flat_bias_file : string
+        Bias image file name for flat field images
+                
     Returns
     -------
     None 
@@ -72,16 +77,22 @@ def process(sci_files, bias_file, flat_file, nskip, threshold, output):
         image_cubes = sci_files.split(",")
 
     # Read bias and flat field images
-    bias_image = chimera.fitsread(bias_file)
+    sci_bias_image = chimera.fitsread(sci_bias_file)
     flat_image = chimera.fitsread(flat_file)
+    
+    if flat_bias_file != "":
+        flat_bias_image = chimera.fitsread(flat_bias_file)
+    else:
+        flat_bias_image = sci_bias_image
 
     # Create master bias image
     print "  Generating master bias image"
-    master_bias_image = chimera.masterbias(bias_image)
+    master_sci_bias_image = chimera.masterbias(sci_bias_image)
+    master_flat_bias_image = chimera.masterbias(flat_bias_image)
 
     # Create normalized flat field
     print "  Generating normalized flat field image"
-    master_flat_image = chimera.masterflat(flat_image, master_bias_image)
+    master_flat_image = chimera.masterflat(flat_image, master_flat_bias_image)
         
     ncubes = len(image_cubes)
     for i in range(ncubes):
@@ -92,7 +103,7 @@ def process(sci_files, bias_file, flat_file, nskip, threshold, output):
         sci_image, header = chimera.fitsread(sci_file, header = True)
 
         # Reduced the science frames
-        sci_red_image, sci_avg_image = chimera.imreduce(sci_image, master_bias_image, master_flat_image)
+        sci_red_image, sci_avg_image = chimera.imreduce(sci_image, master_sci_bias_image, master_flat_image)
 
         # Write the reduced and average FITS image
         if output != "":
@@ -139,6 +150,11 @@ if __name__ == "__main__":
                     action="store", metavar="OUTPUT", help = "Output file name",
                     default = ""
                     )                    
+    parser.add_option("-f", "--flat-bias", dest = "flatbias",
+                    action="store", metavar="FLATBIAS", help = "Bias for Flat field image if different from science image",
+                    default = ""
+                    )
+                                        
                                         
     (options, args) = parser.parse_args()  
     if len(args) != 3:
@@ -150,7 +166,7 @@ if __name__ == "__main__":
         old_stdout = sys.stdout
         sys.stdout = output
  
-    process(args[0], args[1], args[2], options.skip, options.threshold, options.output)    
+    process(args[0], args[1], args[2], options.skip, options.threshold, options.flatbias, options.output)    
 
     # Reset verbosity
     if not options.verbose:

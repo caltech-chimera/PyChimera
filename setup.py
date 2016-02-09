@@ -3,6 +3,7 @@ ez_setup.use_setuptools()
 
 from setuptools import find_packages, setup
 
+
 setup(
       name="CHIMERA",
       version = "0.1",
@@ -23,4 +24,4 @@ setup(
       license = "BSD",
       platforms=["OSX", "Linux", "Unix"],
       url="https://github.com/navtej/CHIMERA",
-) 
+)

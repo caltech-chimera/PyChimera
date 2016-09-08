@@ -53,7 +53,7 @@ def masterflat(flat_image, bias_image, threshold = 0.8):
     # Check if flat fields are 3D array and bias frames is 2D
     if flat_image.ndim == 3 and bias_image.ndim == 2:
         # Change Bias image type from int to float
-        bias_image = bias_image.astype(np.float)
+        flat_image = flat_image.astype(np.float)
         
         # Subtract bias dc from flat fields
         flat_image -= bias_image

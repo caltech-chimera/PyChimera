@@ -198,13 +198,14 @@ class Aperphot:
             iraf.delete(outfile)
             self.daophot(val, self.coords, outfile, apertures = "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20")
             mags = iraf.pdump(outfile, "mag", "yes", Stdout = 1)
+            mags = [mag if mag != 'INDEF' else 30.0 for mag in mags]
             mags_arr = np.array(mags[1].split(),dtype = np.float32)
             mags_diff = np.diff(mags_arr)
-            idx = np.where(np.abs(mags_diff) < 0.01)
+            idx = np.where((np.abs(mags_diff) < 0.01) & (np.abs(mags_diff) != 0.0))
             if len(idx[0]) != 0:
                 nom_aper[cnt] = apertures[idx[0][0]]
             else:
-                nom_aper[cnt] = 12.0
+                nom_aper[cnt] = 10.0
             cnt += 1
             iraf.delete(outfile)
             
@@ -230,7 +231,7 @@ class Aperphot:
         apertures = np.array([2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
         naper = apertures.shape[0]
         
-        # Randomly peform curve of growth on 5 frames
+        # Randomly perform curve of growth on 5 frames
         framenum = np.random.randint(1, self.nframes, 5)
         
         apertures = np.linspace(2,20,19)
@@ -249,11 +250,11 @@ class Aperphot:
                 flux = self.phot(image[val,:,:], objpos, aper = apertures[i])
                 mags_arr[i] = -2.5 * np.log10(flux['flux'])
             mags_diff = np.diff(mags_arr)
-            idx = np.where(np.abs(mags_diff) < 0.01)
+            idx = np.where((np.abs(mags_diff) < 0.01) & (np.abs(mags_diff) != 0.0))
             if len(idx[0]) != 0:
                 nom_aper[cnt] = apertures[idx[0][0]]
             else:
-                nom_aper[cnt] = 12.0
+                nom_aper[cnt] = 10.0
             cnt += 1
             
         return np.median(nom_aper)

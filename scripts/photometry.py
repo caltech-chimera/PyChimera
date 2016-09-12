@@ -109,7 +109,7 @@ def plotter(phot_data, nframes, exptime, outfile):
     return
                 
                                 
-def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output, zmag):
+def process(infile, coords, fwhmpsf, sigma, aperture, annulus, dannulus, output, zmag, debug):
     """
     Entry point function to process science image.
     
@@ -155,7 +155,7 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output, zmag):
         infile = infile[1:]
         
         if not os.path.exists(infile):
-            print "REGISTER: Not able to locate file %s" %infile
+            raise IOError("PHOTOMETRY: Not able to locate file %s. Stopping." %infile)
         
         image_cubes = []
         with open(infile, "r") as fd:
@@ -168,12 +168,29 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output, zmag):
     # Number of images
     ncubes = len(image_cubes)
 
+    # Check if the input coordinates file exists. Take a tmp copy of the input
+    # file and use that. Delete at the end of processing.
+    if not os.path.exists(coords):
+        raise IOError("Input coordinate file %s does not exist. Stopping." %coords)
+    else:
+        tmp_coords = coords + ".tmp"
+        iraf.copy(coords, tmp_coords)
+    
+
     # Fields to extract from phot file
     fields = "XCEN,YCEN,CIER,MSKY,STDEV,NSKY,SIER,SUM,AREA,FLUX,MERR,PIER"
 
+    total_phot_data = []
+    img_sec = []
     for i in range(ncubes):
         sci_file = image_cubes[i]
-        print "  Processing science image %s" %sci_file
+        
+        if not os.path.exists(sci_file):
+            raise IOError("FITS image %s does not exist. Stopping." %sci_file)
+        
+        fpath, fname = os.path.split(sci_file)
+        
+        print "\n  Processing science image %s" %fname
 
         # Instantiate an Aperphot object
         ap = chimera.Aperphot(sci_file, coords)
@@ -187,11 +204,22 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output, zmag):
         if zmag != "":
             ap.zmag = float(zmag)
         
+        # Read the input FITS image
+        if i == 0:
+            img, imghdr = chimera.fitsread(ap.sci_file, header = True)
+        else:
+            img = chimera.fitsread(ap.sci_file)
+
+        
         # Determine nominal aperture radius for photometry
         if i == 0:
-            nom_aper = ap.daocog()
-         
-        print "  Nominal aperture radius : %4.1f pixels" %nom_aper
+            if aperture:
+                nom_aper = float(aperture)
+            else:
+                nom_aper = ap.daocog()
+            
+            print "  Nominal aperture radius : %4.1f pixels" %nom_aper
+           
            
         # Perform aperture photometry on all the frames
         dtype = [("DATETIME", "S25"),("XCEN", "f4"),("YCEN", "f4"),("CIER", "i4"),("MSKY", "f4"),("STDEV", "f4"),("NSKY", "i4"),("SIER", "i4"),("SUM", "f4"),("AREA", "f4"),("FLUX_ADU", "f4"),("FLUX_ELEC", "f4"),("FERR", "f4"),("MAG", "f4"),("MERR", "f4"),("PIER", "i4"),]
@@ -200,9 +228,9 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output, zmag):
             print "    Processing frame number : %d" %(j+1)
              
             outfile = sci_file.replace(".fits", "_" + str(j) + ".phot.1")
-            ap.daophot(j+1, coords, outfile, nom_aper)
+            ap.daophot(j+1, tmp_coords, outfile, nom_aper)
             objcen = dump(outfile, "XCEN,YCEN")
-            with open(coords, "w") as fd:
+            with open(tmp_coords, "w") as fd:
                 fd.write(objcen + '\n')
             
             aperphot_data = dump(outfile, fields).split()
@@ -220,33 +248,78 @@ def process(infile, coords, fwhmpsf, sigma, annulus, dannulus, output, zmag):
             phot_data[j]['FLUX_ADU'] = float(aperphot_data[9])
             phot_data[j]['FLUX_ELEC'] = float(aperphot_data[9]) * ap.epadu
             phot_data[j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[j]['FLUX_ELEC']/ap.exptime)
-            phot_data[j]['MERR'] = float(aperphot_data[10])
+            if aperphot_data[10] == 'INDEF':
+                phot_data[j]['MERR'] = -10
+            else:
+                phot_data[j]['MERR'] = float(aperphot_data[10])
             phot_data[j]['PIER'] = int(aperphot_data[11])
             
             # Calculate error in flux - using the formula
             # err = sqrt(flux * gain + npix * (1 + (npix/nsky)) * (flux_sky * gain + R**2))
             phot_data[j]['FERR'] = np.sqrt(phot_data[j]['FLUX_ELEC'] + phot_data[j]['AREA'] * (1 + phot_data[j]['AREA']/phot_data[j]['NSKY']) * (phot_data[j]['MSKY'] * ap.epadu + ap.readnoise**2))
-                        
-        # Save photometry data in numpy binary format
-        print "  Saving photometry data as numpy binary"
-        if output != "":
-            npy_outfile = output + ".npy"
-        else:
-            npy_outfile = sci_file.replace(".fits", ".phot.npy")
-        if os.path.exists(npy_outfile):
-            os.remove(npy_outfile)
+                      
+            # Save a 51x51 image section of the object
+            xmin, xmax = int(phot_data[j]['XCEN']) - 25, int(phot_data[j]['XCEN']) + 25
+            ymin, ymax = int(phot_data[j]['YCEN']) - 25, int(phot_data[j]['YCEN']) + 25            
             
-        np.save(npy_outfile, phot_data)
+            img_sec.append(img[j, ymin:ymax, xmin:xmax])
 
-        # Plot first pass light curve
-        if plot_flag:
-            print "  Plotting normalized light curve"
-            if output != "":
-                plt_outfile = output + ".png"
-            else:
-                plt_outfile = sci_file.replace(".fits", ".lc.png")
-            plotter(phot_data, ap.nframes, ap.kintime, plt_outfile)
+
+        # Save photometry of all the image cubes in a single file
+        total_phot_data.append(phot_data)
+                
+        # If debug mode -
+        # 1. save DAOPHOT phot files
+        # 2. save individual phot data as npy file
+        # 3. Plot light cuve for each data cube separatly
         
+        if debug:
+            # Save photometry data in numpy binary format
+            print "  Saving photometry data as numpy binary"
+            if output != "":
+                npy_outfile = output + ".npy"
+            else:
+                npy_outfile = coords + "_phot.npy"
+        
+            if os.path.exists(npy_outfile):
+                os.remove(npy_outfile)
+            
+            np.save(npy_outfile, phot_data)
+
+        
+            # Plot first pass light curve
+            if plot_flag:
+                print "  Plotting normalized light curve"
+                if output != "":
+                    plt_outfile = output + ".png"
+                else:
+                    plt_outfile = coords + "_lc.png"
+                plotter(phot_data, ap.nframes, ap.kintime, plt_outfile)
+        else:
+            # Delete intermediate files is not debug mode
+            iraf.delete(os.path.join(fpath, '*.phot.1'))    
+                    
+    # Convert the total_phot_data to array and reshape it
+    print '  Saving consolidated photometry data...'
+    total_phot_data_arr = np.concatenate(total_phot_data)
+        
+    # Save the array as npy file
+    np.save(coords + "_total.phot.npy", total_phot_data_arr)
+
+    # Save the image section with object as FITS file
+    print '  Saving image section with object as FITS image...'
+    img_sec_arr = np.asarray(img_sec)
+
+    img_fname = coords + "_obj.fits"
+    if os.path.exists(img_fname):
+        os.remove(img_fname)
+            
+    chimera.fitswrite(img_sec_arr, coords + "_obj.fits", header = imghdr)
+                        
+    # Delete temporary coordinate file
+    if os.path.exists(tmp_coords):
+        os.remove(tmp_coords)
+    
     return
 
 
@@ -270,6 +343,10 @@ if __name__ == "__main__":
                     action="store", metavar="SIGMA", help = "Sky background sigma (default is 10)",
                     default = 10
                     )
+    parser.add_option("-a", "--aperture", dest = "aperture",
+                    action="store", metavar="APERTURE", help = "Photometry aperture radius (default is None)",
+                    default = None
+                    )                    
     parser.add_option("-r", "--annulus", dest = "annulus",
                     action="store", metavar="ANNULUS", help = "Inner radius of sky annlus in pixels (default is 14)",
                     default = 14
@@ -283,9 +360,13 @@ if __name__ == "__main__":
                     default=""
                     ) 
     parser.add_option("-z", "--zmag", dest = "zmag",
-                    action="store", metavar="ZMAG", help = "Photometric zeroo point",
+                    action="store", metavar="ZMAG", help = "Photometric zero point",
                     default = ""
-                    )       
+                    )   
+    parser.add_option("-b", "--debug", dest = "debug",
+                    action="store", metavar="DEBUG", help = "Debug modes? Default is False",
+                    default = False
+                    )                           
                                                                 
                                         
     (options, args) = parser.parse_args()  
@@ -301,7 +382,7 @@ if __name__ == "__main__":
     # Switch off warnings
     warnings.filterwarnings('ignore')
     
-    process(args[0], args[1], options.fwhmpsf, options.sigma, options.annulus, options.dannulus, options.output, options.zmag)    
+    process(args[0], args[1], options.fwhmpsf, options.sigma, options.aperture, options.annulus, options.dannulus, options.output, options.zmag, options.debug)    
 
     # Reset verbosity
     if not options.verbose:

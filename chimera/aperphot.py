@@ -7,7 +7,7 @@ from pyraf import iraf
 from datetime import datetime, timedelta
 
     
-MONTHS = {"Jan": 1, "Feb": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+MONTHS = {"Jan": 1, "Feb": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "Aug": 8, "Sept": 9, "Oct": 10, "Nov": 11, "Dec": 12}
 
 
 class Aperphot:
@@ -201,7 +201,7 @@ class Aperphot:
             mags = [mag if mag != 'INDEF' else 30.0 for mag in mags]
             mags_arr = np.array(mags[1].split(),dtype = np.float32)
             mags_diff = np.diff(mags_arr)
-            idx = np.where((np.abs(mags_diff) < 0.01) & (np.abs(mags_diff) != 0.0))
+            idx = np.where((np.abs(mags_diff) < tolerance) & (np.abs(mags_diff) != 0.0))
             if len(idx[0]) != 0:
                 nom_aper[cnt] = apertures[idx[0][0]]
             else:

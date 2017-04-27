@@ -2,7 +2,7 @@ from __future__ import division
 
 
 import numpy as np
-from photutils.morphology import centroid_com, centroid_1dg, centroid_2dg
+from photutils import centroid_com, centroid_1dg, centroid_2dg
 
 
 def recenter(image, pos, window_size = 15, method = "2dg"):

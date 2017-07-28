@@ -2,9 +2,9 @@
 
 """
     --------------------------------------------------------------------------
-    Routine to perform aperture photometry on CHIMERA science frames,
-    processing multiple stars simultaneously. Modification of fastphot.
-    Usage: python multiphot.py [options] image coords
+    Routine to perform aperture photometry on CHIMERA science frames.
+
+    Usage: python fastphot.py [options] image coords
 
 
     Authors:
@@ -16,16 +16,14 @@
     Version:
         7 January 2016     0.1     Initial implementation
         9 February 2016    0.2     User input for photometric zero point
-        23 July 2017       1.0     Parallel processing modification.
+        28 July 2017       0.3     Allow processing of multiple stars.
     --------------------------------------------------------------------------
 """
 
 import os, sys
 import numpy as np, warnings
-import multiprocessing
 from StringIO import StringIO
 from optparse import OptionParser
-import chimera
 
 try:
     import matplotlib.pylab as plt
@@ -38,47 +36,51 @@ else:
         pass
     plot_flag = True
 
-def onephot(sci_file, coord, out_array):
-    ap = chimera.Aperphot(sci_file, coord, i)
 
-    # Set fwhmpsf, sigma, annulus, dannulus and zmag
-    ap.method = method
-    ap.inner_radius = inner_radius
-    ap.outer_radius = outer_radius
+import chimera
 
-    if zmag != "":
-        ap.zmag = float(zmag)
 
-    # Determine nominal aperture radius for photometry
-    if i == 0:
-        nom_aper = ap.cog(window_size, cen_method)
+def plotter(phot_data, nframes, exptime, outfile):
+    """
+    Plot light curve.
 
-    # Perform aperture photometry on all the frames
-    dtype = [("DATETIME", "S25"),("XCEN", "f4"),("YCEN", "f4"),("MSKY", "f8"),("NSKY", "f8"),("AREA", "f8"),("FLUX_ADU", "f8"),("FLUX_ELEC", "f8"),("FERR", "f8"),("MAG", "f8")]
-    phot_data = np.zeros([ap.nframes], dtype = dtype)
-    for j in range(ap.nframes):
-        print "    Processing frame number : %d" %(j+1)
+    Parameters
+    ----------
+    phot_data : numpy array
+        Photometry array
 
-        objpos = chimera.recenter(image[j,:,:], pos, window_size, cen_method)
-        aperphot_data = ap.phot(image[j,:,:], objpos, nom_aper)
-        pos = np.copy(objpos)
+    nframes : int
+        Number of image cube frames
 
-        phot_data[j]['DATETIME'] = ap.addtime(j * ap.kintime).isoformat()
-        phot_data[j]['XCEN'] = aperphot_data["xcenter_raw"]
-        phot_data[j]['YCEN'] = aperphot_data["ycenter_raw"]
-        phot_data[j]['MSKY'] = aperphot_data["msky"]
-        phot_data[j]['NSKY'] = aperphot_data["nsky"]
-        phot_data[j]['AREA'] = aperphot_data["area"]
-        phot_data[j]['FLUX_ADU'] = aperphot_data["flux"]
-        phot_data[j]['FLUX_ELEC'] = phot_data[j]['FLUX_ADU'] * ap.epadu
-        phot_data[j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[j]['FLUX_ELEC']/ap.exptime)
+    exptime : float
+        Kinetic or accumulation time
 
-        # Calculate error in flux - using the formula
-        # err = sqrt(flux * gain + npix * (1 + (npix/nsky)) * (flux_sky * gain + R**2))
-        phot_data[j]['FERR'] = np.sqrt(phot_data[j]['FLUX_ELEC'] + phot_data[j]['AREA'] * (1 + phot_data[j]['AREA']/phot_data[j]['NSKY']) * (phot_data[j]['MSKY'] * ap.epadu + ap.readnoise**2))
+    outfile : string
+        Name of the out png image
 
-    out_array.append(phot_data)
+    Returns
+    -------
+    None
+    """
+    params = {'backend': 'ps',
+	      'font.size': 10,
+              'axes.labelweight': 'medium',
+	      'figure.dpi' : 300,
+              'savefig.dpi': 300,
+              'savefig.jpeg_quality': 100
+              }
+    plt.rcParams.update(params)
+
+    ts = np.linspace(0, nframes*exptime, nframes)
+    plt.figure(figsize=(6,4))
+    plt.title("Normalized Light Curve : %s" %phot_data[0]['DATETIME'].split('T')[0])
+    plt.xlabel("Time (secs)")
+    plt.ylabel("Normalized Flux")
+    plt.plot(ts, phot_data['FLUX_ADU']/np.mean(phot_data['FLUX_ADU']), "r-")
+    plt.savefig(outfile, dpi = 300, bbox_inches = "tight")
+
     return
+
 
 def process(infile, coords, method, inner_radius, outer_radius, cen_method, window_size, output, zmag):
     """
@@ -138,16 +140,13 @@ def process(infile, coords, method, inner_radius, outer_radius, cen_method, wind
     else:
         image_cubes = infile.split(",")
 
-    # Number of images and of stars
+    # Number of images
     ncubes = len(image_cubes)
-    pos = np.loadtxt(coords)#, ndmin = 2)
+    pos = np.loadtxt(coords, ndmin = 2)
     nstars = len(pos)
 
-    for i in range(nstars):
-        total_phot_data{}.format(i) = []
+    total_phot_data = []
 
-    #Crudely lock multiple processes outside of loop.
-    lock = np.zeros(ncubes)
     for i in range(ncubes):
         sci_file = image_cubes[i]
         print "  Processing science image %s" %sci_file
@@ -155,30 +154,77 @@ def process(infile, coords, method, inner_radius, outer_radius, cen_method, wind
         # Read FITS image and star coordinate
         image = chimera.fitsread(sci_file)
 
-        #Begin parallelization here
-        jobs = []
-        for j in range(nstars):
-            p = multiprocessing.Process(target=onephot, args=(sci_file, coords[j], total_phot_data{}.format(j)))
-            jobs.append(p)
-            p.start()
-        lock[i]=1
+        # Instantiate an Aperphot object
+        ap = chimera.Aperphot(sci_file, coords)
 
-        '''
+        # Set fwhmpsf, sigma, annulus, dannulus and zmag
+        ap.method = method
+        ap.inner_radius = inner_radius
+        ap.outer_radius = outer_radius
+
+        if zmag != "":
+            ap.zmag = float(zmag)
+
+        # Determine nominal aperture radius for photometry
+        if i == 0:
+            nom_aper = ap.cog(window_size, cen_method)
+
+        print "  Nominal aperture radius : %4.1f pixels" %nom_aper
+
+        # Perform aperture photometry on all the frames
+        dtype = [("DATETIME", "S25"),("XCEN", "f4"),("YCEN", "f4"),("MSKY", "f8"),("NSKY", "f8"),("AREA", "f8"),("FLUX_ADU", "f8"),("FLUX_ELEC", "f8"),("FERR", "f8"),("MAG", "f8")]
+        phot_data = np.zeros([nstars, ap.nframes], dtype = dtype)
+        for j in range(ap.nframes):
+            print "    Processing frame number : %d" %(j+1)
+
+            objpos = chimera.recenter(image[j,:,:], pos, window_size, cen_method)
+            aperphot_data = ap.phot(image[j,:,:], objpos, nom_aper)
+            pos = np.copy(objpos)
+
+            phot_data[:,j]['DATETIME'] = ap.addtime(j * ap.kintime).isoformat()
+            phot_data[:,j]['XCEN'] = aperphot_data["xcenter_raw"]
+            phot_data[:,j]['YCEN'] = aperphot_data["ycenter_raw"]
+            phot_data[:,j]['MSKY'] = aperphot_data["msky"]
+            phot_data[:,j]['NSKY'] = aperphot_data["nsky"]
+            phot_data[:,j]['AREA'] = aperphot_data["area"]
+            phot_data[:,j]['FLUX_ADU'] = aperphot_data["flux"]
+            phot_data[:,j]['FLUX_ELEC'] = phot_data[:,j]['FLUX_ADU'] * ap.epadu
+            phot_data[:,j]['MAG'] = ap.zmag - 2.5 * np.log10(phot_data[:,j]['FLUX_ELEC']/ap.exptime)
+
+            # Calculate error in flux - using the formula
+            # err = sqrt(flux * gain + npix * (1 + (npix/nsky)) * (flux_sky * gain + R**2))
+            phot_data[:,j]['FERR'] = np.sqrt(phot_data[:,j]['FLUX_ELEC'] + phot_data[:,j]['AREA'] * (1 + phot_data[j]['AREA']/phot_data[j]['NSKY']) * (phot_data[j]['MSKY'] * ap.epadu + ap.readnoise**2))
+
+        total_phot_data.append(phot_data)
+
         # Save photometry data in numpy binary format
         print "  Saving photometry data as numpy binary"
         if output != "":
             npy_outfile = output + ".npy"
         else:
-            npy_outfile = sci_file.replace(".fits", ".phot{}.npy".format(i))
+            npy_outfile = sci_file.replace(".fits", ".phot.npy")
         if os.path.exists(npy_outfile):
             os.remove(npy_outfile)
-        '''
-    #Activate 'lock'.
-    while np.sum(lock)!= ncubes:
-        pass
-    for i in range(nstars):
-        total_phot_data_arr = np.concatenate(total_phot_data{}.format(i))
-        np.save("phot_total{}.npy".format(i), total_phot_data_arr)
+
+        #np.save(npy_outfile, phot_data)
+
+        # Plot first pass light curve
+        if plot_flag:
+            print "  Plotting normalized light curve"
+            if output != "":
+                plt_outfile = output + ".png"
+            else:
+                plt_outfile = sci_file.replace(".fits", ".lc.png")
+            plotter(phot_data, ap.nframes, ap.kintime, plt_outfile)
+
+    # Convert the total_phot_data to array and reshape it
+    print '  Saving consolidated photometry data...'
+    total_phot_data_arr = np.concatenate(total_phot_data, axis=1)
+
+    # Save the array as npy file
+    if output != "":
+        np.save(output+"phot_total.npy", total_phot_data_arr)
+    else: np.save("phot_total.npy", total_phot_data_arr)
 
     return
 

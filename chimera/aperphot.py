@@ -248,7 +248,10 @@ class Aperphot:
             objpos = chimera.recenter(image[val,:,:], pos, window_size, method)
             for i in range(naper):
                 flux = self.phot(image[val,:,:], objpos, aper = apertures[i])
-                mags_arr[i] = -2.5 * np.log10(flux['flux'])
+                try:
+                    mags_arr[i] = -2.5 * np.log10(flux['flux'])
+                except:
+                    mags_arr[i] = -2.5 * np.log10(flux['flux'][0])
             mags_diff = np.diff(mags_arr)
             idx = np.where((np.abs(mags_diff) < 0.01) & (np.abs(mags_diff) != 0.0))
             if len(idx[0]) != 0:

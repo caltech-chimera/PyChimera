@@ -251,7 +251,7 @@ class Aperphot:
                 try:
                     mags_arr[i] = -2.5 * np.log10(flux['flux'])
                 except:
-                    mags_arr[i] = -2.5 * np.log10(flux['flux'][0])
+                    mags_arr[i] = -2.5 * np.log10(flux['flux'][1])
             mags_diff = np.diff(mags_arr)
             idx = np.where((np.abs(mags_diff) < 0.01) & (np.abs(mags_diff) != 0.0))
             if len(idx[0]) != 0:
